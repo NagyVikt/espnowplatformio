@@ -547,3 +547,13 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   include("/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/src/cmake_install.cmake")
 endif()
 
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/stats/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/hub/cmake_install.cmake")
+endif()
+

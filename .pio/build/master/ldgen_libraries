@@ -84,3 +84,5 @@
 /home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/spiffs/libspiffs.a
 /home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/wifi_provisioning/libwifi_provisioning.a
 /home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/src/libsrc.a
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/stats/libstats.a
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/hub/libhub.a

@@ -833,3 +833,17 @@
 /home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/src/CMakeFiles/rebuild_cache.dir
 /home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/src/CMakeFiles/install.dir
 /home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/src/CMakeFiles/list_install_components.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/stats/CMakeFiles/install/strip.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/stats/CMakeFiles/install/local.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/stats/CMakeFiles/__idf_stats.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/stats/CMakeFiles/edit_cache.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/stats/CMakeFiles/rebuild_cache.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/stats/CMakeFiles/install.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/stats/CMakeFiles/list_install_components.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/hub/CMakeFiles/install/strip.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/hub/CMakeFiles/install/local.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/hub/CMakeFiles/edit_cache.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/hub/CMakeFiles/rebuild_cache.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/hub/CMakeFiles/install.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/hub/CMakeFiles/__idf_hub.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/esp-idf/hub/CMakeFiles/list_install_components.dir
