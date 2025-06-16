@@ -847,3 +847,10 @@
 /home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/hub/CMakeFiles/install.dir
 /home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/hub/CMakeFiles/__idf_hub.dir
 /home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/hub/CMakeFiles/list_install_components.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/station/CMakeFiles/install/strip.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/station/CMakeFiles/install/local.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/station/CMakeFiles/__idf_station.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/station/CMakeFiles/edit_cache.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/station/CMakeFiles/rebuild_cache.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/station/CMakeFiles/install.dir
+/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master/esp-idf/station/CMakeFiles/list_install_components.dir
