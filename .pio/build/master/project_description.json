@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "espnow",
-    "project_version":    "55821cd-dirty",
+    "project_version":    "4a1aa34-dirty",
     "project_path":       "/home/deadpool/Documents/PlatformIO/Projects/espnow",
     "idf_path":           "/home/deadpool/.platformio/packages/framework-espidf",
     "build_dir":          "/home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/master",
