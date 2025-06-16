@@ -1,0 +1,2 @@
+source /home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/bootloader/gdbinit/symbols
+source /home/deadpool/Documents/PlatformIO/Projects/espnow/.pio/build/slave/bootloader/gdbinit/connect
