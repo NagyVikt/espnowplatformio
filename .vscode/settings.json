@@ -53,6 +53,9 @@
         "text_encoding": "cpp",
         "cinttypes": "cpp",
         "typeinfo": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "projdefs.h": "c",
+        "esp_event.h": "c",
+        "esp_wifi.h": "c"
     }
 }

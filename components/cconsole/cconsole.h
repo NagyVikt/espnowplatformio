@@ -1,10 +1,10 @@
 /*******************************BEGIN: INCLUDE GUARD*******************************/
-#ifndef HUB_H_
-#define HUB_H_
+#ifndef CCONSOLE_H_
+#define CCONSOLE_H_
 
 
 /*******************************BEGIN: STANDARD LIBRARY INCLUDES*******************************/
-#include <stdint.h>
+
 /*******************************END: STANDARD LIBRARY INCLUDES*******************************/
 
 
@@ -13,13 +13,14 @@
 
 /*******************************END: HEADER FILE INCLUDES OF DIFFERENT MODULES*******************************/
 
-/*******************************BEGIN: STRUCTS, ENUMS, UNIONS, DEFINES (PUBLIC)*******************************/
 
-typedef struct {
-	uint8_t mac_addr[6];
-}PEER_t;
+/*******************************BEGIN: PUBLIC STRUCTS, ENUMS, UNIONS, DEFINES*******************************/
+enum e_device_mode {
+	MODE_HUB,
+	MODE_STA
+};
+/*******************************END: PUBLIC STRUCTS, ENUMS, UNIONS, DEFINES*******************************/
 
-/*******************************END: END: STRUCTS, ENUMS, UNIONS, DEFINES (PUBLIC)*******************************/
 
 /*******************************BEGIN: GLOBAL VARIABLES EXPOSED BY THIS MODULE*******************************/
 
@@ -28,12 +29,7 @@ typedef struct {
 
 
 /*******************************BEGIN: API PROTOTYPES EXPOSED BY THIS MODULE*******************************/
-void hub_init(void);
-void hub_spawn_comm_task(PEER_t	peer);
-void hub_spawn_comm_loop_task(PEER_t peer);
-void hub_spawn_comm_all_loop_task(int loop);
-void hub_spawn_measurement_task(void);
-void hub_delete_measurement_task(void);
+void cconsole_init(enum e_device_mode device_mode);
 /*******************************END: API PROTOTYPES EXPOSED BY THIS MODULE*******************************/
 
 

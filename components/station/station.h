@@ -23,7 +23,6 @@
 
 /*******************************BEGIN: API PROTOTYPES EXPOSED BY THIS MODULE*******************************/
 void sta_init(void);
-void sta_run(void);
 /*******************************END: API PROTOTYPES EXPOSED BY THIS MODULE*******************************/
 
 

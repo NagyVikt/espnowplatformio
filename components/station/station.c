@@ -17,10 +17,15 @@
 #include "esp_now.h"			// Required for ESP-NOW
 #include"esp_log.h"
 #include <string.h>
+#include "sdkconfig.h"
 /*******************************END: MODULE HEADER FILE INCLUDE*******************************/
 
 /*******************************BEGIN: STRUCTS, ENUMS, UNIONS, DEFINES*******************************/
-#define DEBUG_LOG 0
+#define DEBUG_LOG CONFIG_DEBUG_LOG
+#define TAG "STATION"
+
+#define STA_COMMUNICATION_TASK_PRIO 5
+#define PEER_ARR_SIZE 1
 
 typedef struct {
 	uint8_t mac_addr[6];
@@ -31,37 +36,34 @@ typedef struct {
 	uint8_t data[ESP_NOW_MAX_DATA_LEN_V2];
 }RECEIVE_DATA_t;
 
-#define TAG "STATION"
-#define STA_COMMUNICATION_TASK_PRIO 5
+struct s_queue_handlers {
+	QueueHandle_t send_cb_msg_queue;
+	QueueHandle_t recv_cb_msg_queue;
+};
 /*******************************END: GSTRUCTS, ENUMS, UNIONS, DEFINES*******************************/
 
 /*******************************BEGIN: GLOBAL VARIABLES PRIVATE TO MODULE*******************************/
 uint8_t cmd[] = {0xFF, 0xFF, 0xFF, 0xFF};
 uint8_t ack[] = {0xEE, 0xEE, 0xEE, 0xEE};
-uint8_t data[100];
+uint8_t data[128];
 
-PEER_t peers[] = {
-	{.mac_addr = {0x54, 0x32, 0x04, 0x07, 0x41, 0xF4}}			// Add peer MAC addresses here
+static const char *mac_str_arr[1] = {
+	CONFIG_MASTER
 };
 
-/*PEER_t peers[] = {
-	{.mac_addr = {0x5C, 0x01, 0x3B, 0x69, 0xFB, 0x70}}			
-};*/
+static PEER_t peer_arr[PEER_ARR_SIZE];
 
-
-QueueHandle_t send_cb_msg_queue;
-QueueHandle_t recv_cb_msg_queue;
-
+struct s_queue_handlers queue_handlers;
 /*******************************END: GLOBAL VARIABLES PRIVATE TO MODULE*******************************/
 
 /*******************************BEGIN: HELPER FUNCTION PROTOTYPES PRIVATE TO MODULE*******************************/
-static void sta_espnow_send_cb(const uint8_t *mac_addr,
-                                esp_now_send_status_t status);
+static void sta_espnow_send_cb(const esp_now_send_info_t *tx_info, esp_now_send_status_t status);
 static void sta_espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len);
 static void sta_connect_peer(PEER_t g_peer);
 static void sta_init_tasks(void);
 static void sta_communication_task(void *arg);
 static void sta_print_mac_addr(void);
+static void hub_peer_arr_init(void);
 /*******************************END: HELPER FUNCTION PROTOTYPES PRIVATE TO MODULE*******************************/
 
 /*******************************BEGIN: APIs EXPOSED BY THIS MODULE*******************************/
@@ -93,38 +95,25 @@ static void sta_print_mac_addr(void);
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));	
 	ESP_ERROR_CHECK(esp_wifi_start());
 	ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+	ESP_ERROR_CHECK(esp_wifi_set_channel(6,  WIFI_SECOND_CHAN_NONE));
 
 	ESP_ERROR_CHECK(esp_now_init());
 
 	ESP_ERROR_CHECK(esp_now_register_send_cb(sta_espnow_send_cb));
 	ESP_ERROR_CHECK(esp_now_register_recv_cb(sta_espnow_recv_cb));
 
-	send_cb_msg_queue = xQueueCreate(1, sizeof(esp_now_send_status_t));
-	recv_cb_msg_queue = xQueueCreate(1, sizeof(RECEIVE_DATA_t));
+	queue_handlers.send_cb_msg_queue = xQueueCreate(1, sizeof(esp_now_send_status_t));
+	queue_handlers.recv_cb_msg_queue = xQueueCreate(1, sizeof(RECEIVE_DATA_t));
 
 	sta_print_mac_addr();
 
 	memset(data, 'A', sizeof(data));
 
+	hub_peer_arr_init();
+
 	sta_init_tasks();
  }
 
- /*******************************API INFORMATION*******************************
- * @fn			- sta_run();
- * 
- * @brief		- 
- * 
- * @param[in]	- none
- * @param[in]	- none
- * @param[in]	- none
- * 
- * @return		- none
- * 
- * @note		- Yet to be implemented if needed.
- *****************************************************************************/
- void sta_run(void) {
-
- }
 /*******************************END: APIs EXPOSED BY THIS MODULE*******************************/
  
  
@@ -145,10 +134,15 @@ static void sta_print_mac_addr(void);
  * 
  * @note		- Gets called automatically when the message is sent.
  *****************************************************************************/
-static void sta_espnow_send_cb(const uint8_t *mac_addr,
-                               esp_now_send_status_t status) {
-	xQueueSend(send_cb_msg_queue, &status, pdMS_TO_TICKS(5));
- }
+static void sta_espnow_send_cb(const esp_now_send_info_t *tx_info, esp_now_send_status_t status) {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    
+    xQueueSendFromISR(queue_handlers.send_cb_msg_queue, &status, &xHigherPriorityTaskWoken);
+    
+    if(xHigherPriorityTaskWoken) {
+        portYIELD_FROM_ISR();
+    }
+}
 
  /*******************************FUNCTION INFORMATION*******************************
  * @fn			- sta_espnow_recv_cb()
@@ -165,6 +159,7 @@ static void sta_espnow_send_cb(const uint8_t *mac_addr,
  *****************************************************************************/
 static void sta_espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) {
 	RECEIVE_DATA_t recv_data;
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
 	if(len > ESP_NOW_MAX_DATA_LEN_V2) {
 		len = ESP_NOW_MAX_DATA_LEN_V2;
@@ -174,7 +169,11 @@ static void sta_espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8
 
 	memcpy(recv_data.data, data, len);
 
-	xQueueSend(recv_cb_msg_queue, &recv_data, pdMS_TO_TICKS(5));
+    xQueueSendFromISR(queue_handlers.recv_cb_msg_queue, &recv_data, &xHigherPriorityTaskWoken);
+
+	if(xHigherPriorityTaskWoken) {
+        portYIELD_FROM_ISR();
+    }
 }
 
 /*******************************FUNCTION INFORMATION*******************************
@@ -192,7 +191,7 @@ static void sta_espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8
  *****************************************************************************/
  static void sta_connect_peer(PEER_t g_peer) {
 	esp_now_peer_info_t peer = {		
-		.channel = 0,					
+		.channel = 6,					
 		.ifidx = ESP_IF_WIFI_STA,		
 		.encrypt = false
 	};
@@ -214,7 +213,7 @@ static void sta_espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8
  * @note		- none
  *****************************************************************************/
  static void sta_init_tasks(void) {
-	xTaskCreatePinnedToCore(sta_communication_task, "Station task", 4096, (void*)&peers[0], STA_COMMUNICATION_TASK_PRIO, NULL, tskNO_AFFINITY);
+	xTaskCreatePinnedToCore(sta_communication_task, "StaTask", 4096, (void*)&peer_arr[0], STA_COMMUNICATION_TASK_PRIO, NULL, tskNO_AFFINITY);
  }
 
  /*******************************FUNCTION INFORMATION*******************************
@@ -249,7 +248,7 @@ static void sta_espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8
 		data_sent = false;
 
 		// Receive CMD
-		if (xQueueReceive(recv_cb_msg_queue, &data_from_recv_cb, pdMS_TO_TICKS(100)) == pdTRUE) {
+		if (xQueueReceive(queue_handlers.recv_cb_msg_queue, &data_from_recv_cb, pdMS_TO_TICKS(100)) == pdTRUE) {
 			if (data_from_recv_cb.len == sizeof(cmd)) {
 				cmd_recv = true;
 				for (uint16_t i = 0; i < sizeof(cmd); i++) {
@@ -273,7 +272,7 @@ static void sta_espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8
 		// Send ACK
 		if(cmd_recv) {
 			ESP_ERROR_CHECK(esp_now_send(peer->mac_addr, ack, sizeof(ack)));
-			if(xQueueReceive(send_cb_msg_queue, &msg_from_send_cb, pdMS_TO_TICKS(100)) == pdTRUE) {
+			if(xQueueReceive(queue_handlers.send_cb_msg_queue, &msg_from_send_cb, pdMS_TO_TICKS(100)) == pdTRUE) {
 				if(msg_from_send_cb == ESP_NOW_SEND_SUCCESS) {
 					ack_sent = true;
 #if DEBUG_LOG
@@ -291,7 +290,7 @@ static void sta_espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8
 		// If ACK has been sent, send data
 		if(ack_sent) {
 			esp_now_send(peer->mac_addr, data, sizeof(data));
-			if(xQueueReceive(send_cb_msg_queue, &msg_from_send_cb, pdMS_TO_TICKS(100)) == pdTRUE) {
+			if(xQueueReceive(queue_handlers.send_cb_msg_queue, &msg_from_send_cb, pdMS_TO_TICKS(100)) == pdTRUE) {
 				if(msg_from_send_cb == ESP_NOW_SEND_SUCCESS) {
 					data_sent = true;
 #if DEBUG_LOG
@@ -337,5 +336,32 @@ static void sta_espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8
     ESP_ERROR_CHECK(esp_wifi_get_mac(ESP_IF_WIFI_STA, mac));
     ESP_LOGI("MAC_ADDRESS", "MAC: %02X:%02X:%02X:%02X:%02X:%02X", 
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
+/*******************************FUNCTION INFORMATION*******************************
+ * @fn			- hub_peer_arr_init()
+ * 
+ * @brief		- Parses the MAC addresses from menuconfig to uint8_t type
+ * 
+ * @param[in]	- none
+ * @param[in]	- none
+ * @param[in]	- none
+ * 
+ * @return		- none
+ * 
+ * @note		- none
+ *****************************************************************************/
+static void hub_peer_arr_init(void) {
+	for (int i = 0; i < PEER_ARR_SIZE; i++) {
+		int b[6];
+		if (sscanf(mac_str_arr[i], "%x:%x:%x:%x:%x:%x",
+				&b[0], &b[1], &b[2], &b[3], &b[4], &b[5]) == 6) {
+			for (int j = 0; j < 6; j++) {
+				peer_arr[i].mac_addr[j] = (uint8_t)b[j];
+			}
+		} else {
+			ESP_LOGE(TAG, "Invalid MAC address format at index %d", i);
+		}
+	}
 }
  /*******************************END: HELPER FUNCTION DEFINITIONS*******************************/

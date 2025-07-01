@@ -1,0 +1,13 @@
+menu "Station Configuration"
+
+config DEBUG_LOG
+bool "Enable debug logging in STA"
+default n
+help
+	Enables extra debug messages in hub.c
+
+config MASTER
+    string "MASTER_MAC_ADDR"
+    default "00:00:00:00:00:00"
+
+endmenu
