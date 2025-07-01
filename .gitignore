@@ -10,9 +10,5 @@
 # === Arduino-ESP32 component (if you vendor-checked it) ===
 components/arduino/arduino-esp32/
 
-# === ESP-IDF sdkconfig files per-env (generated) ===
-sdkconfig.*           # ignore sdkconfig.master, sdkconfig.hub, etc.
-!sdkconfig.base       # but keep sdkconfig.base under source control
-
-# If you actually want to ignore sdkconfig.base too, just drop the negation:
-# sdkconfig.*
+sdkconfig.*
+!sdkconfig.base
