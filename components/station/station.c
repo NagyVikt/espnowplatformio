@@ -57,7 +57,7 @@ struct s_queue_handlers queue_handlers;
 /*******************************END: GLOBAL VARIABLES PRIVATE TO MODULE*******************************/
 
 /*******************************BEGIN: HELPER FUNCTION PROTOTYPES PRIVATE TO MODULE*******************************/
-static void sta_espnow_send_cb(const esp_now_send_info_t *tx_info, esp_now_send_status_t status);
+static void sta_espnow_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status);
 static void sta_espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len);
 static void sta_connect_peer(PEER_t g_peer);
 static void sta_init_tasks(void);
@@ -134,7 +134,7 @@ static void hub_peer_arr_init(void);
  * 
  * @note		- Gets called automatically when the message is sent.
  *****************************************************************************/
-static void sta_espnow_send_cb(const esp_now_send_info_t *tx_info, esp_now_send_status_t status) {
+static void sta_espnow_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     
     xQueueSendFromISR(queue_handlers.send_cb_msg_queue, &status, &xHigherPriorityTaskWoken);
