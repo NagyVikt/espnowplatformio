@@ -87,7 +87,7 @@ static const char *mac_str_arr[10] = {
 /*******************************END: GLOBAL VARIABLES PRIVATE TO MODULE*******************************/
 
 /*******************************BEGIN: CALLBACK FUNCTION PROTOTYPES PRIVATE TO MODULE*******************************/
-static void hub_espnow_send_cb(const esp_now_send_info_t *tx_info, esp_now_send_status_t status);
+static void hub_espnow_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status);
 static void hub_espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len);
 /*******************************END: CALLBACK FUNCTION PROTOTYPES PRIVATE TO MODULE*******************************/
 
@@ -288,7 +288,7 @@ void hub_delete_measurement_task(void) {
  * 
  * @note		- Gets called automatically when the message is sent
  *****************************************************************************/
-static void hub_espnow_send_cb(const esp_now_send_info_t *tx_info, esp_now_send_status_t status) {
+static void hub_espnow_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     
     xQueueSendFromISR(queue_handlers.send_cb_msg_queue, &status, &xHigherPriorityTaskWoken);
