@@ -1,3 +1,4 @@
+// components/stats/include/stats.h
 #ifndef STATS_H_
 #define STATS_H_
 
@@ -13,6 +14,11 @@
 #define STATS_TICKS         pdMS_TO_TICKS(1000)
 #define ARRAY_SIZE_OFFSET   5
 
-void stats_run(void);
+// these two were missing:
+void stats_spawn_task(void);
+void stats_delete_task(void);
 
+void stats_run(void);
+void stats_spawn_task(void);
+void stats_delete_task(void);
 #endif // STATS_H_

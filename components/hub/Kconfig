@@ -1,0 +1,58 @@
+menu "Hub Configuration"
+
+config DEBUG_LOG
+    bool "Enable debug logging in HUB"
+    default n
+    help
+        Enables extra debug messages in hub.c
+
+menu "Station MAC Addresses"
+
+config NUM_MACS
+	int "Number of stations to use"
+	default 4
+    range 1 10
+
+config STATION_1
+    string "STATION_1_MAC_ADDR"
+    default "00:00:00:00:00:01"
+
+config STATION_2
+    string "STATION_2_MAC_ADDR"
+    default "00:00:00:00:00:02"
+
+config STATION_3
+    string "STATION_3_MAC_ADDR"
+    default "00:00:00:00:00:03"
+
+config STATION_4
+    string "STATION_4_MAC_ADDR"
+    default "00:00:00:00:00:04"
+
+config STATION_5
+    string "STATION_5_MAC_ADDR"
+    default "00:00:00:00:00:05"
+
+config STATION_6
+    string "STATION_6_MAC_ADDR"
+    default "00:00:00:00:00:06"
+
+config STATION_7
+    string "STATION_7_MAC_ADDR"
+    default "00:00:00:00:00:07"
+
+config STATION_8
+    string "STATION_8_MAC_ADDR"
+    default "00:00:00:00:00:08"
+
+config STATION_9
+    string "STATION_9_MAC_ADDR"
+    default "00:00:00:00:00:09"
+
+config STATION_10
+    string "STATION_10_MAC_ADDR"
+    default "00:00:00:00:00:0A"
+
+endmenu
+
+endmenu
