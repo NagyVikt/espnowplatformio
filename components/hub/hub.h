@@ -34,6 +34,8 @@ void hub_spawn_comm_loop_task(PEER_t peer);
 void hub_spawn_comm_all_loop_task(int loop);
 void hub_spawn_measurement_task(void);
 void hub_delete_measurement_task(void);
+
+
 /*******************************END: API PROTOTYPES EXPOSED BY THIS MODULE*******************************/
 
 
