@@ -1,12 +1,12 @@
-// app_main.cpp
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/i2c.h"
 #include "esp_log.h"
 #include "esp_err.h"
 #include <cstring>
+#include <string>
 #include <algorithm>
+
 extern "C" {
     #include "nvs_flash.h"
     #include "esp_netif.h"
@@ -21,28 +21,31 @@ static const char* TAG = "NORBI_SLAVE";
 static constexpr i2c_port_t  I2C_MASTER_NUM     = I2C_NUM_0;
 static constexpr gpio_num_t  I2C_MASTER_SDA_IO  = GPIO_NUM_21;
 static constexpr gpio_num_t  I2C_MASTER_SCL_IO  = GPIO_NUM_22;
-static constexpr uint32_t     I2C_MASTER_FREQ_HZ = 100000;
-static constexpr int          MAX_CHANNEL        = 40;
-static constexpr size_t       MAX_MSG_LEN        = 128;
-static constexpr uint8_t      ESPNOW_CHANNEL     = 0;
-static constexpr uint8_t      MCP_I2C_ADDRS[]    = {0x20,0x21,0x22,0x23,0x24};
+static constexpr uint32_t    I2C_MASTER_FREQ_HZ = 100000;
+static constexpr int         MAX_CHANNEL        = 40;
+static constexpr size_t      MAX_MSG_LEN        = 128;
+static constexpr uint8_t     ESPNOW_CHANNEL     = 0;
+static constexpr uint8_t     MCP_I2C_ADDRS[]    = {0x20,0x21,0x22,0x23,0x24};
 
+// special 4-byte hub command and ACK
 static const uint8_t CMD_BYTES[4] = {0xFF,0xFF,0xFF,0xFF};
 static const uint8_t ACK_BYTES[4] = {0xEE,0xEE,0xEE,0xEE};
 
 // ======== Globals ========
-static uint8_t  lastHubMac[6];
-static bool     haveLastHub = false;
-static bool     monitored[MAX_CHANNEL];
-static bool     blinkState  = false;
+static uint8_t     lastHubMac[6];
+static bool        haveLastHub = false;
+static bool        monitored[MAX_CHANNEL];
+static bool        blinkState  = false;
+static std::string missing, extra;
 
-enum class State {
+// plain enum so switch(state) compiles
+enum State {
     SELF_CHECK,
     WAIT_FOR_TARGET,
     MONITORING,
-    FINAL_CHECK,
+    FINAL_CHECK
 };
-static State state = State::SELF_CHECK;
+static State state = SELF_CHECK;
 
 struct ChannelPins { uint8_t mcp_idx, led_pin, sw_pin; };
 static ChannelPins channelPins[MAX_CHANNEL];
@@ -59,6 +62,7 @@ static esp_err_t mcp_write_reg(uint8_t addr, uint8_t reg, uint8_t val) {
     i2c_cmd_link_delete(cmd);
     return err;
 }
+
 static esp_err_t mcp_read_reg(uint8_t addr, uint8_t reg, uint8_t &val) {
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
@@ -85,6 +89,7 @@ static void build_channel_pins() {
     }
 }
 
+// Set or clear an LED
 static void set_led(int ch, bool on) {
     const auto &p = channelPins[ch];
     uint8_t reg = 0x14 + ((p.led_pin >> 3) * 2);
@@ -92,6 +97,7 @@ static void set_led(int ch, bool on) {
     mcp_write_reg(MCP_I2C_ADDRS[p.mcp_idx], reg, on ? bit : 0);
 }
 
+// Read a switch (HIGH when not pressed)
 static bool read_switch(int ch) {
     const auto &p = channelPins[ch];
     uint8_t reg = 0x12 + ((p.sw_pin >> 3) * 2);
@@ -100,31 +106,43 @@ static bool read_switch(int ch) {
     return (val & (1 << (p.sw_pin & 7))) != 0;
 }
 
-// ======== Send SUCCESS / FAILURE back to HUB ========
-static bool send_result(const char *txt) {
+// ======== ESP-NOW send helpers ========
+static bool send_raw(const uint8_t *data, size_t len) {
     if (!haveLastHub) return false;
     esp_now_peer_info_t peer = {};
     memcpy(peer.peer_addr, lastHubMac, 6);
     peer.channel = ESPNOW_CHANNEL;
     peer.encrypt = false;
     esp_now_add_peer(&peer);
-    esp_err_t res = esp_now_send(lastHubMac, (const uint8_t*)txt, strlen(txt)+1);
+    esp_err_t res = esp_now_send(lastHubMac, data, len);
     esp_now_del_peer(lastHubMac);
     return (res == ESP_OK);
 }
 
+static bool send_result(const char *txt) {
+    return send_raw(reinterpret_cast<const uint8_t*>(txt), strlen(txt) + 1);
+}
+
+// ======== Check all channels ========
 static bool check_all() {
     bool ok = true;
-    for(int ch=0; ch<MAX_CHANNEL; ++ch) {
+    missing.clear();
+    extra.clear();
+
+    for (int ch = 0; ch < MAX_CHANNEL; ++ch) {
         bool sw = read_switch(ch);
         if (monitored[ch]) {
             set_led(ch, sw);
-            if (sw) ok = false;
+            if (sw) {
+                ok = false;
+                missing += std::to_string(ch + 1) + ",";
+            }
         } else {
             set_led(ch, false);
             if (!sw) {
                 set_led(ch, blinkState);
                 ok = false;
+                extra += std::to_string(ch + 1) + ",";
             }
         }
     }
@@ -135,55 +153,49 @@ static bool check_all() {
 static void on_data_recv(const esp_now_recv_info_t *info,
                          const uint8_t *data, int len)
 {
-    // Eltároljuk a HUB MAC-címét, hogy erre tudjunk válaszolni
+    // stash hub MAC
     memcpy(lastHubMac, info->src_addr, 6);
     haveLastHub = true;
 
-    // Ha a HUB CMD-jét kaptuk (0xFF,0xFF,0xFF,0xFF), ACK-elünk
+    // 1) Hub handshake
     if (len == 4 && memcmp(data, CMD_BYTES, 4) == 0) {
         ESP_LOGI(TAG, "Got HUB CMD → sending ACK");
-        esp_now_peer_info_t peer = {};
-        memcpy(peer.peer_addr, lastHubMac, 6);
-        peer.channel = ESPNOW_CHANNEL;
-        peer.encrypt = false;
-        esp_now_add_peer(&peer);
-        esp_now_send(lastHubMac, ACK_BYTES, 4);
-        esp_now_del_peer(lastHubMac);
+        send_raw(ACK_BYTES, 4);
         return;
     }
 
-    // Egyébként átadjuk a NORBI állapotgépre
+    // 2) MONITOR / CHECK
     ESP_LOGI(TAG, "Recv %d bytes from HUB", len);
-    if (state == State::WAIT_FOR_TARGET) {
+    if (state == WAIT_FOR_TARGET) {
         const char prefix[] = "MONITOR ";
-        if (len > int(strlen(prefix)) && strncmp((char*)data, prefix, strlen(prefix)) == 0) {
+        if (len > int(strlen(prefix)) &&
+            strncmp(reinterpret_cast<const char*>(data), prefix, strlen(prefix)) == 0)
+        {
             memset(monitored, 0, sizeof(monitored));
-            for(int i=0;i<MAX_CHANNEL;i++) set_led(i,false);
+            for (int i = 0; i < MAX_CHANNEL; ++i) set_led(i, false);
 
             char buf[MAX_MSG_LEN];
-            int copy_len = std::min(len, int(MAX_MSG_LEN-1));
-            memcpy(buf, data, copy_len);
-            buf[copy_len] = '\0';
+            int l = std::min(len, int(MAX_MSG_LEN - 1));
+            memcpy(buf, data, l);
+            buf[l] = '\0';
 
-            char *tok = strtok(buf + strlen(prefix), ",");
-            while(tok) {
-                int ch = atoi(tok)-1;
-                if (ch>=0 && ch<MAX_CHANNEL) {
-                    monitored[ch]=true;
-                    set_led(ch,true);
+            for (char *tok = strtok(buf + strlen(prefix), ","); tok; tok = strtok(nullptr, ",")) {
+                int c = atoi(tok) - 1;
+                if (c >= 0 && c < MAX_CHANNEL) {
+                    monitored[c] = true;
+                    set_led(c, true);
                 }
-                tok = strtok(nullptr, ",");
             }
-            state = State::MONITORING;
-            ESP_LOGI(TAG, ">> MONITORING");
+            state = MONITORING;
+            ESP_LOGI(TAG, ">> ENTERING MONITORING");
         }
     }
-    else if (state == State::MONITORING) {
+    else if (state == MONITORING) {
         const char check_cmd[] = "CHECK";
         if (len >= int(strlen(check_cmd)) &&
-            strncmp((char*)data, check_cmd, strlen(check_cmd)) == 0)
+            strncmp(reinterpret_cast<const char*>(data), check_cmd, strlen(check_cmd)) == 0)
         {
-            state = State::FINAL_CHECK;
+            state = FINAL_CHECK;
             ESP_LOGI(TAG, ">> FINAL_CHECK");
         }
     }
@@ -197,72 +209,96 @@ static void init_i2c_and_mcp() {
     conf.scl_io_num = I2C_MASTER_SCL_IO;
     conf.master.clk_speed = I2C_MASTER_FREQ_HZ;
     i2c_param_config(I2C_MASTER_NUM, &conf);
-    ESP_ERROR_CHECK(i2c_driver_install(I2C_MASTER_NUM, I2C_MODE_MASTER, 0,0,0));
+    ESP_ERROR_CHECK(i2c_driver_install(I2C_MASTER_NUM, I2C_MODE_MASTER, 0, 0, 0));
+
     build_channel_pins();
     for (uint8_t a : MCP_I2C_ADDRS) {
-        ESP_ERROR_CHECK(mcp_write_reg(a,0x00,0x00)); // A outputs
-        ESP_ERROR_CHECK(mcp_write_reg(a,0x01,0xFF)); // B inputs
+        // Port A = outputs
+        ESP_ERROR_CHECK(mcp_write_reg(a, 0x00, 0x00));
+        // Port B = inputs
+        ESP_ERROR_CHECK(mcp_write_reg(a, 0x01, 0xFF));
+        // Port B pull-ups ON (like Arduino INPUT_PULLUP)
+        ESP_ERROR_CHECK(mcp_write_reg(a, 0x0D, 0xFF));
     }
 }
 
 static void init_espnow_slave() {
-    // 1) NVS  
     ESP_ERROR_CHECK(nvs_flash_init());
-    // 2) TCP/IP stack + event loop  
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    // 3) Wi-Fi STA  
+
     wifi_init_config_t wcfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&wcfg));
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
-    // 4) ESP-NOW  
+
     ESP_ERROR_CHECK(esp_now_init());
-    // 5) reg. receive callback  
     ESP_ERROR_CHECK(esp_now_register_recv_cb(on_data_recv));
 }
 
-// ======== App Entry Point ========
+// ======== App Main ========
 extern "C" void app_main() {
     ESP_LOGI(TAG, "Slave starting...");
 
     init_i2c_and_mcp();
     init_espnow_slave();
 
-    // NORBI állapotgép főciklusa
-    while(true) {
+    while (true) {
         blinkState = !blinkState;
-        switch(state) {
-            case State::SELF_CHECK: {
+        switch (state) {
+            case SELF_CHECK: {
                 bool any = false;
-                for(int ch=0; ch<MAX_CHANNEL; ++ch) {
+                for (int ch = 0; ch < MAX_CHANNEL; ++ch) {
                     bool pressed = !read_switch(ch);
                     set_led(ch, blinkState && pressed);
                     any |= pressed;
                 }
-                if(!any) {
-                    state = State::WAIT_FOR_TARGET;
-                    ESP_LOGI(TAG, ">> SELF_CHECK OK");
+                if (!any) {
+                    state = WAIT_FOR_TARGET;
+                    ESP_LOGI(TAG, ">> SELF_CHECK passed, waiting for MONITOR");
                 }
                 break;
             }
-            case State::MONITORING:
+
+            case WAIT_FOR_TARGET: {
+                for (int ch = 0; ch < MAX_CHANNEL; ++ch) {
+                    set_led(ch, false);
+                }
+                break;
+            }
+
+            case MONITORING:
                 check_all();
                 break;
-            case State::FINAL_CHECK: {
-                int good=0;
-                for(int i=0;i<5;++i) {
-                    if(check_all()) good++;
+
+            case FINAL_CHECK: {
+                int good = 0;
+                for (int i = 0; i < 5; ++i) {
+                    if (check_all()) good++;
                     vTaskDelay(pdMS_TO_TICKS(50));
                 }
-                if(good>=5) {
+                if (good >= 5) {
                     ESP_LOGI(TAG, ">> FINAL_PASS");
                     send_result("SUCCESS");
-                    state = State::SELF_CHECK;
+                    state = SELF_CHECK;
                 } else {
                     ESP_LOGI(TAG, ">> FINAL_FAIL");
-                    send_result("FAILURE");
-                    state = State::MONITORING;
+                    std::string msg = "FAILURE";
+                    if (!missing.empty()) {
+                        msg += " MISSING ";
+                        msg += missing;
+                    }
+                    if (!extra.empty()) {
+                        if (missing.empty()) {
+                            msg += " EXTRA ";
+                        } else {
+                            msg += ";EXTRA ";
+                        }
+                        msg += extra;
+                    }
+                    msg += ',';
+                    send_result(msg.c_str());
+                    state = MONITORING;
                 }
                 break;
             }
